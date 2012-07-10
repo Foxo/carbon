@@ -16,7 +16,7 @@ function sql_insert($table, $data) {
 			$values[] = mysql_real_escape_string($v);
 		}
 		
-		sql_query("INSERT INTO `".ir_pre.$table."` (`".implode("`, `", $fields)."`) VALUES('".implode("', '", $values)."')");
+		sql_query("INSERT INTO `".fc_pre.$table."` (`".implode("`, `", $fields)."`) VALUES('".implode("', '", $values)."')");
 		
 		return true;
 	} else {
@@ -30,7 +30,7 @@ function sql_update($table, $data, $sel, $where = 'id') {
 			$fields[] = "`".$f."` = '".mysql_real_escape_string($v)."'";
 		}
 		
-		sql_query("UPDATE `".ir_pre.$table."` SET ".implode(", ", $fields)." WHERE `".$where."` = '".$sel."'");
+		sql_query("UPDATE `".fc_pre.$table."` SET ".implode(", ", $fields)." WHERE `".$where."` = '".$sel."'");
 		
 		return true;
 	} else {
@@ -39,16 +39,16 @@ function sql_update($table, $data, $sel, $where = 'id') {
 }
 
 function sql_selectBy($table, $id, $where = 'id') {
-	return sql_query("SELECT * FROM `".ir_pre.$table."` WHERE `$where` = '$id'");
+	return sql_query("SELECT * FROM `".fc_pre.$table."` WHERE `$where` = '$id'");
 }
 
 function sql_selectByIndex($table, $id, $where = 'id', $level = true) {
-	$d = sql_query("SELECT * FROM `".ir_pre.$table."` WHERE `$where` = '$id'");
+	$d = sql_query("SELECT * FROM `".fc_pre.$table."` WHERE `$where` = '$id'");
 	return ($level === true) ? $d[0] : $d;
 }
 
 function sql_deleteByIndex($table, $id, $where = 'id') {
-	sql_query("DELETE FROM `".ir_pre.$table."` WHERE `".$where."` = '".$id."'");
+	sql_query("DELETE FROM `".fc_pre.$table."` WHERE `".$where."` = '".$id."'");
 	return mysql_affected_rows();
 }
 

@@ -1,8 +1,8 @@
 <?php
-class InspiredRealtyCore {
+class realty {
 	public $errors = array();
 	 
-	public function __construct($options) {
+	public function __construct($options = false) {
 		if(is_array($options)) {
 			$this->options = $options;
 		}
@@ -120,11 +120,11 @@ class InspiredRealtyCore {
 		if(is_numeric($search['id'])) {
 			$params = array('get', 'id', $search['id']);
 		} else {
-			// More complex search - cities/datatypes/fields/etc...
+			$params = array('search', 'agency', '5', 'datatype', '3', 'limit', '1000', '0', 'status-or', '7', '12', '10', '9');
 		}
 		
 		if($this->request('listings', $params)) {	
-			if($this->parseListingFields()) {
+			if($this->parse_listing_fields()) {
 				return $this->results;		
 			}
 		}
@@ -132,13 +132,15 @@ class InspiredRealtyCore {
 		return false;	
 	}
 	
-	public function parseListingFields() {
+	public function parse_listing_fields() {
 		if(count($this->results) > 0) {
-			foreach($this->results['fields'] as $field) {
-				$newFields[$field['name']] = $field;		
+			foreach($this->results as $x => $listing) {
+				foreach($listing['fields'] as $field) {
+					$newFields[$field['name']] = $field['prefix'].$field['data'].$field['suffix'];		
+				}
+				
+				$this->results[$x]['fields'] = $newFields;
 			}
-			
-			$this->results['fields'] = $newFields;
 			
 			return true;
 		} else {

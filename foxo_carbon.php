@@ -1,52 +1,85 @@
 <?php
 /**
- * @package FOXO Common
+ * @package FOXO Carbon
  * @version 1.0
  */
+ 
 /*
-Plugin Name: FOXO Common
+Plugin Name: FOXO Carbon
 Plugin URI: www.foxo.ca
-Description:  
+Description: Foxo Carbon is a wordpress plugin that gives me (or, any developer) the ability to easily add dynamic functionality to a site. This plugin is meant to handle various tasks, such as contact form, inspired realty listings, sudoc files and much more...
 Author: FOXO
 Version: 1.0
 Author URI: http://www.foxo.ca
 */
 
-define('fc_pluginDir', dirname(__FILE__));
-define('fc_pluginUrl', WP_PLUGIN_URL.'/foxo_carbon/');
+define('fc_plugin_dir', dirname(__FILE__).'/');
+define('fc_plugin_url', WP_PLUGIN_URL.'/foxo_carbon/');
 define('fc_basePage', 'fc_settings');
 define('fc_pre', 'foxo_');
 
 
-require(fc_pluginDir.'/libraries/functions.mysql.php');
-require(fc_pluginDir.'/libraries/functions.common.php');
-require(fc_pluginDir.'/libraries/class.inspiredrealty.php');
-require(fc_pluginDir.'/libraries/class.phpmailer.php');
-
-
-
+require(fc_plugin_dir.'helpers/help.mysql.php');
+require(fc_plugin_dir.'helpers/help.common.php');
 
 
 class FC_Template {
-	public function __construct($template = '', $data = '') {
-		if(!empty($template)) {
-			$this->template = fc_pluginDir.'/themes/'.$template.'.php';	
+	private $data = false;
+	private $template = false;
+	
+	public function __construct($template = false, $data = false) {
+		if($template) {
+			$this->set_template($template);
 		}
 		
-		if(is_array($data)) {
-			$this->data = $data;	
+		if($data) {
+			$this->set_data($data);
 		}
 	}
 	
-	public function output() {
+	public function set_template($file) {
+		if(strtolower($file) === 'json') {
+			$this->template = 'json';	
+		} else {
+			$file = fc_plugin_dir.'themes/'.$file.'.php';
+			
+			if(!file_exists($file)) {
+				throw new Exception('The template file you have specified does not exist');	
+			}
+			
+			$this->template = $file;
+		}
+		
+		return $this;
+	}
+	
+	public function set_data($key, $value = false) {
+		if(is_array($key)) {
+			foreach($key as $x => $v) {
+				$this->data[$x] =	$v;
+			}
+		} else {
+			$this->data[$key] = $value;	
+		}
+		
+		return $this;
+	}
+	
+	public function output($print = false) {
 		$var = $this->data;
 		
 		if($this->template == 'json') {
-			return json_encode($var);
+			$out = json_encode($var);
 		} else {
 			ob_start();
 			require($this->template);
-			return ob_get_clean();
+			$out = ob_get_clean();
+		}
+		
+		if($print) {
+			echo $out;
+		} else {
+			return $out;
 		}
 	}
 }
@@ -55,7 +88,7 @@ class FC_Template {
  *	HELPER CLASS
  **************/		 
 class FC_ClassHelper {
-	public function loadOptions($o) {
+	public function load_options($o) {
 		$this->options = $o;
 		
 		if(!empty($o['fromShortCode'])) {
@@ -70,49 +103,46 @@ class FC_ClassHelper {
 		}
 	}
 	
-	public function printInTemplate($print = false) {
-		$html = new FC_Template($this->template, $this->content);
+	function load_lib($class) {
+		$class_file = fc_plugin_dir.'libraries/class.'.$class.'.php';
 		
-		if($html === false) {
-			wp_die('You are trying to access a theme or template file that does not exist.', 'Theme file does not exist');	
-		} else {
-			if($print) {
-				echo $html->output();
+		if(file_exists($class_file)) {
+			require_once($class_file);
+			
+			if(class_exists($class)) {
+				$this->{ucfirst($class)} = new $class;
+				
+				return true;
 			} else {
-				return $html->output();
+				throw new Exception('Unable to load specified library, Make sur the class name matches the file?');	
 			}
 		}
+		
+		return false;
 	}
 	
-	public function validateInputFields($fields, $post) {
-		if(is_array($fields) && is_array($post)) {
-			foreach($fields as $f => $r) {
-				$d = $post[$f];
-				
-				if(is_array($r)) {
-					if(empty($d) && $r['required'] === true) {
-						$this->errors[$f] = $r['error'];
-					}
-					
-					if(!empty($r['regex']) && preg_match() === false) {
-						$this->errors[$f] = $r['error'];
-					}
-				}
-				
-				$this->postData[$f] = $d;	
-			}
+	function load_help($file) {
+		$file = fc_plugin_dir.'helpers/help.'.$file.'.php';
+		
+		if(file_exists($file)) {
+			require_once($file);
 			
-			return $data;	
+			return true;
 		} else {
-			return false;	
+			throw new Exception('Unable to load helper');	
 		}
+		
+		return false;
 	}
 }
 
 class FC_Plugin extends FC_ClassHelper {
 	public function __construct() {
-		add_filter('the_content', array($this, 'parseContent'));
-		add_action('init', array($this, 'pluginStart'));
+		$this->load_lib('realty');
+		$this->load_lib('phpmailer');
+		
+		add_filter('the_content', array($this, 'parse_content'));
+		add_action('init', array($this, 'plugin_start'));
 		
 		register_activation_hook( __FILE__, array($this, install));
 		register_uninstall_hook( __FILE__, array($this, uninstall));
@@ -127,7 +157,7 @@ class FC_Plugin extends FC_ClassHelper {
 	  return $vars;
 	}
 	
-	public function pluginStart() {
+	public function plugin_start() {
 		// Load global scripts (jquery, etc...)	
 		wp_deregister_script('jquery'); 
 		wp_register_script('jquery', ("http://ajax.googleapis.com/ajax/libs/jquery/1.7/jquery.min.js"), false); 
@@ -135,15 +165,15 @@ class FC_Plugin extends FC_ClassHelper {
 		
 		if(is_admin()) {
 			// Admin Javascript
-			wp_enqueue_script('notifier', ir_pluginUrl.'javascript/notifier.js', 'jquery');
+			wp_enqueue_script('notifier', fc_plugin_url.'javascript/notifier.js', 'jquery');
 			
 			// Admin Hooks
-			add_action('admin_menu', array($this, 'adminMenu'));
+			//add_action('admin_menu', array($this, 'adminMenu'));
 			//add_action('wp_ajax_ir_profiles', array($this, 'ajaxController'));
 		} else {
 			// Add Filters
-			add_filter('wp_title', array($this, 'modifyPageTitle'), 10, 2);
-			add_filter('query_vars', array($this, 'fc_query_vars'));
+			//add_filter('wp_title', array($this, 'modifyPageTitle'), 10, 2);
+			//add_filter('query_vars', array($this, 'fc_query_vars'));
 			
 			//wp_enqueue_style('irealtyStyle', ir_pluginUrl.'themes/default/iRealty.css');
 				
@@ -164,10 +194,81 @@ class FC_Plugin extends FC_ClassHelper {
 		}	
 	}
 	
+	
+	
+	/**************************************
+	 * FRONT-END HOOK FUNCTIONS 
+	 * These functions are called when the plugin is loaded from the front-end
+	 ******/
+	public function parse_shortcode($match) {
+		global $post; 
+		
+		$this->load_options(array(
+			'shortCodeOptions' => $match['options'],
+			'mode' => $match['mode'],
+			'permaLink' => get_permalink($post->ID)
+		));
+		
+		switch($this->options['mode']) {
+			case 'video_gallery':
+				//$html = new FC_Template('default/video_gallery', $data);
+				//return $html->output();	
+			break;
+			
+			case 'inspired_realty':
+				$data['listings'] = $this->Realty->listings();
+				
+				//print_r($data);
+				
+				$html = new FC_Template('default/inspired_realty/listing_index', $data);
+				return $html->output();	
+			break;
+			
+			case 'contact':
+				if(count($_POST) > 0) {
+					$data = array(
+						'name' => $_POST['full_name'],
+						'email' => $_POST['email'],
+						'comment' => $_POST['comment']
+					);
+					
+					$email = new FC_Template('default/contact_email', $data);
+					
+					$mailer = new phpmailer;
+					$mailer->preconfig_Send('scott@foxo.ca', 'Contact Form Submission', $email->output(), $data['email'], $data['name']);
+					
+					$data['submitted'] = true;	
+				}
+				
+				$html = new FC_Template('default/contact_form', $data);
+				return $html->output();
+			break;
+			
+			case 'url':
+				return '/';
+			break;	
+		}
+		
+		
+		//return $this->printInTemplate();
+	}
+	
+	
+	public function parse_content($content) {
+		global $post, $wp;
+	
+		if($post->post_type !== 'page') {
+			return $content;
+		}
+		
+		
+		return preg_replace_callback('/\[foxo_(?P<mode>\w*)\s?(options="(?P<options>.*)")?\]/', array($this, 'parse_shortcode'), $content);	
+	}
+	
 	/**************************************
 	 * ADMIN HOOK FUNCTIONS 
 	 * These functions are called when the plugin is loaded from within the admin panel
-	 ******/
+	 *****
 	public function adminMenu() {
 		add_object_page(__('Foxo Common'), __('Foxo Common'), 2, fc_basePage);
 		add_submenu_page(ir_basePage, __('Event Manager'),  __('Event Manager'), 2, 'fc_events', array($this, 'eventManager'));
@@ -224,87 +325,7 @@ class FC_Plugin extends FC_ClassHelper {
 		
 		die($this->printInTemplate());
 	}
-	
-	/**************************************
-	 * FRONT-END HOOK FUNCTIONS 
-	 * These functions are called when the plugin is loaded from the front-end
-	 ******/
-	public function parseShortCode($match) {
-		global $post; 
-		
-		$this->loadOptions(array(
-			'shortCodeOptions' => $match['options'],
-			'mode' => $match['mode'],
-			'permaLink' => get_permalink($post->ID)
-		));
-		
-		switch($this->options['mode']) {
-			case 'video_gallery':
-				$html = new FC_Template('default/video_gallery', $data);
-				return $html->output();	
-			break;
-			
-			case 'inspired_realty':
-				$IR = new InspiredRealtyCore;
-				
-				$data['listings'] = $IR->listings();
-				
-				print_r($data);
-				
-				$html = new FC_Template('default/inspired_realty/listing_index', $data);
-				return $html->output();	
-			break;
-			
-			case 'contact':
-				if(count($_POST) > 0) {
-					$data = array(
-						'name' => $_POST['full_name'],
-						'email' => $_POST['email'],
-						'comment' => $_POST['comment']
-					);
-					
-					$email = new FC_Template('default/contact_email', $data);
-					
-					$mailer = new phpmailer;
-					$mailer->preconfig_Send('scott@foxo.ca', 'Contact Form Submission', $email->output(), $data['email'], $data['name']);
-					
-					$data['submitted'] = true;	
-				}
-				
-				$html = new FC_Template('default/contact_form', $data);
-				return $html->output();
-			break;
-			
-			case 'url':
-				return '/';
-			break;	
-		}
-		
-		
-		//return $this->printInTemplate();
-	}
-	
-	
-	public function parseContent($content) {
-		global $post, $wp;
-	
-		if($post->post_type !== 'page') {
-			return $content;
-		}
-		
-		
-		return preg_replace_callback('/\[foxo_(?P<mode>\w*)\s?(options="(?P<options>.*)")?\]/', array($this, 'parseShortCode'), $content);	
-	}
-	
-	public function modifyPageTitle($title) {
-		if(is_numeric($_GET['showListing'])) {
-			$this->IR->listings(array('id' => $_GET['showListing']));
-			$title.= $this->IR->results['street_address'].' | '.$this->IR->results['city']['city_title'].' |';
-		}	
-		
-		return $title;
-		
-	}
+	*/
 	
 	/**************************************
 	 * ACTIVATION/UNINSTAL HOOK FUNCTIONS 
@@ -321,4 +342,4 @@ class FC_Plugin extends FC_ClassHelper {
 	}
 }
 
-$IR = new FC_Plugin;
+$Carbon = new FC_Plugin;

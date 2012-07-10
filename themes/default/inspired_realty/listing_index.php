@@ -11,26 +11,35 @@
       
       <div id="IR_Results">
       	<?php
-			foreach($var['listings'] as $listing) {
+			echo '<div class="row-fluid">';
+			
+			foreach($var['listings'] as $x => $listing) {
+				if($x > 0 && ($x%3) === 0) {
+					echo '</div>';
+					echo '<div class="row-fluid">';
+				}
 				?>
             <div class="span4">
-               <img class="listing_thumb_image" src="http://placehold.it/233x120" />
+               <img class="listing_thumb_image" src="<?=$listing['images'][0]['medium']; ?>" />
+               
+               <div class="listing_thumb_info">
+                  <span class="listing_thumb_street"><?=$listing['street_address']; ?></span><br />
+                  <span class="listing_thumb_city"><?=$listing['city']['city_title'].', '.$listing['city']['region_abbv']; ?></span> 
+               </div>
+               
                <div class="row-fluid">
                   <div class="span8">
-                     <h5 class="listing_thumb_price">$5,000,000</h5>
+                     <h5 class="listing_thumb_price"><?=$listing['fields']['Price']; ?></h5>
                   </div>
                   <div class="span4">
                      <a href="" class="btn btn-mini">Details</a>
                   </div>
                </div>
-               
-               <div class="listing_thumb_info">
-                  <span class="listing_thumb_street">2171 E King Secondary Street</span><br />
-                  <span class="listing_thumb_city">Vancouver, BC</span> 
-               </div>
             </div>
             <?php	
 			}
+			
+			echo '</div>';
 			?>
       </div>
    </section>
